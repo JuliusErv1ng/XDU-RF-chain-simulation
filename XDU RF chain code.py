@@ -38,7 +38,6 @@ def time_data_get(filename, Ts, show_flag):
 
     # = == == == == == == == == == =Time-frequency parameter generation == == == == == == == == == == == == == == == == == == == == ==
     # = == == =In order to make the frequency resolution 1MHz, the number of sampling points = sampling frequency == == == =
-
     fs = 1 / Ts * 1000  # sampling frequency, MHZ
     N = math.ceil(fs)
     f0 = fs / N  # base frequency, Frequency resolution
@@ -251,22 +250,12 @@ def inter(data_complex_five,e_theta,e_phi):
                 L2 = data_complex[up_theta, down_phi]
                 L3 = data_complex[down_theta, up_phi]
                 L4 = data_complex[up_theta, up_phi]
-                if a < 1e-5:
-                    if b < 1e-5:
-                        data_current = data_complex[round(e_theta), round(e_phi)]
-                    else:
-                        ratio = (e_phi - down_phi) / 1
-                        data_current = ratio * (
-                                data_complex[round(e_theta), down_phi] + data_complex[round(e_theta), up_phi])
-                else:
-                    if b < 1e-5:
-                        ratio = (e_theta - down_theta) / 1
-                        data_current = ratio * (
-                                data_complex[down_theta, round(e_phi)] + data_complex[up_theta, round(e_phi)])
-                    else:
-                        ratio = (e_theta - down_theta) * (e_phi - down_phi) / 1
-                        data_current = ratio * (L1 + L2 + L3 + L4)
-                data_new[i, j, k] = data_current
+                rt1 = (e_theta - down_theta) / 1.
+                rt0 = 1.0 - rt1
+                rp1 = (e_phi - down_phi) / 1.
+                rp0 = 1.0 - rp1
+
+                data_new[i, j, k] = rt0 * rp0 * L1 + rt1 * rp0 * L2 + rt0 * rp1 * L3 + rt1 * rp1 * L4
     return np.array(data_new)
 # ==========================================complex expansion========================
 def expan(N, f0, f1, f2, data):
@@ -834,7 +823,7 @@ def mkdir(path):
 
 
 
-#=====================================================main============================================================
+#=====================================================!!!Start the main program from here!!!=========================================
 rootdir = "..//data//"
 print(rootdir)
 verse = []
@@ -847,7 +836,7 @@ for root in os.listdir(rootdir):
         # print(root)
 # print(verse)
 # print(type(verse))
-#=====================================If the folder starts with Stshp, add the target to be processed=========================================
+#=====================================If the folder starts with Stshp, add the target to be processed================================
 for item in verse:
     if item.startswith('Stshp_') == True:
         target.append(item)
@@ -857,7 +846,8 @@ for i in range(0, len(target)):
     file_dir = "..//data//" + target[i]
     print(file_dir)
     list1 = target[i].split('_')
-
+    content = []
+    target_trace = []
 
     primary = list1[3]
     energy = float(list1[4])
@@ -913,6 +903,17 @@ for i in range(0, len(target)):
         Ts = 0.5  # Manually enter the same time interval as the .trace file
         random = 0
         E_path = file_dir + '//a' + str(random) + '.trace'
+
+        for a in os.listdir(file_dir):
+            # print(root)
+            # print(os.path.isdir(root))
+            # if os.path.isdir(root) == True:            #判断是否为文件夹
+            content.append(a)
+        for b in content:
+            # print(os.path.splitext(b)[1])
+            if os.path.splitext(b)[1] == '.trace':
+                target_trace.append(b)
+
         #  ===========================start calculating===================
         [t_cut, ex_cut, ey_cut, ez_cut, fs, f0, f, f1, N] = time_data_get(E_path, Ts, show_flag)  # Signal interception
 
@@ -936,7 +937,7 @@ for i in range(0, len(target)):
 
 
 # ===============================Start loop calculation========================================================================
-    for num in range(176):
+    for num in range(len(target_trace)):
         # air shower,input file
         E_path = file_dir+ '//a' + str(num) + '.trace'
         xunhuan = '//a' + str(num) + '_trace.txt'
@@ -1028,6 +1029,6 @@ for i in range(0, len(target)):
             V_output3[:, 1:] = V_filter_t[:, :]
             np.savetxt(outfile_vfilter + xunhuan, V_output3, fmt="%.10e", delimiter=" ")
 
-        # ======================Time delay=============================================
+        # ======================delete target_trace=============================================
 
-
+    del target_trace
