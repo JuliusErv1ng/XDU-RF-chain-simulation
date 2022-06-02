@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import math
 from numpy.ma import log10, abs
 from scipy import interpolate
+import random
 
 # ==============================time domain shower Edata get===============================
 def time_data_get(filename, Ts, show_flag):
@@ -460,27 +461,35 @@ def gala(lst, N, f0, f1, show_flag):
 
     f_start = 30
     f_end = 250
-    v_amplitude_double = np.zeros((N, 3), dtype=complex)
-    v_amplitude_fft = np.zeros((N, 3), dtype=complex)
-    v_complex_double = np.zeros((N, 3), dtype=complex)
+
+    R = 50
+    v_complex_double = np.zeros((176, N, 3), dtype=complex)
+    galactic_v_time = np.zeros((176, N, 3), dtype=float)
+    galactic_v_m_single = np.zeros((176, int(N / 2) + 1, 3), dtype=float)
+    galactic_v_p_single = np.zeros((176, int(N / 2) + 1, 3), dtype=float)
     unit_uv = 1e6
-    for p in range(3):
-        [f, v_amplitude_double[:, p]] = expan(N, f0, f_start, f_end, GALAvoltage[:, p, lst])  # Expanded voltage
+    V_amplitude = 2 * np.sqrt(GALApower_mag * R) * unit_uv
 
-        v_amplitude_fft[0, p] = v_amplitude_double[0, p] * N
-        v_amplitude_fft[1:, p] = v_amplitude_double[1:, p] * N / 2
+    aa = np.zeros((176, 221, 3), dtype=float)
+    phase = np.zeros((176, 221, 3), dtype=float)
+    v_complex = np.zeros((176, 221, 3), dtype=complex)
+    for mm in range(176):
+        for ff in range(221):
+            for pp in range(3):
+                aa[mm, ff, pp] = np.random.normal(loc=0, scale=V_amplitude[ff, pp])
+                phase[mm, ff, pp] = 2 * np.pi * random.random()  # 加入一随机高斯白噪声的相位
+                v_complex[mm, ff, pp] = abs(aa[mm, ff, pp] * N / 2) * np.exp(1j * phase[mm, ff, pp])
 
-        # Add a random Gauss white noise phase
-        Noise_time = np.random.randn(N, 1) * np.sqrt(np.mean(GALApower_mag[:, p])) * unit_uv  # Generate a Gauss noise
-        [Noise_fft, Noise_fft_m_single, Noise_fft_p_single] = fftget(Noise_time, N, f1, 0)
-        Noise_p = np.angle(Noise_fft)  # If phase, deg is True, the return value adopts the angle system; if it is False (default), the return value adopts the radian system.
+    pass
 
-        # Generate complex numbers
-        v_complex_double[:, p] = v_amplitude_fft[:, p] * np.exp(1j * Noise_p[:, 0])
+    for kk in range(176):
 
-    # time domain
-    [galactic_v_time, galactic_v_m_single, galactic_v_p_single] = ifftget(v_complex_double, N, f1, 2)
-    return v_complex_double, galactic_v_time
+        for port in range(3):
+            [f, v_complex_double[kk, :, port]] = expan(N, f0, f_start, f_end, v_complex[kk, :, port])
+            # print(v_complex_double[k, :, port])
+        [galactic_v_time[kk], galactic_v_m_single[kk], galactic_v_p_single[kk]] = ifftget(v_complex_double[kk], N, f1, 2)
+
+        return v_complex_double, galactic_v_time
 
 
 # ===========================================LNAparameter get===========================================
@@ -901,8 +910,8 @@ for i in range(0, len(target)):
         # demo = int(input("please input demo number:"))
         lst = 18
         Ts = 0.5  # Manually enter the same time interval as the .trace file
-        random = 0
-        E_path = file_dir + '//a' + str(random) + '.trace'
+        randomn = 0
+        E_path = file_dir + '//a' + str(randomn) + '.trace'
 
         for a in os.listdir(file_dir):
             # print(root)
@@ -912,7 +921,8 @@ for i in range(0, len(target)):
         for b in content:
             # print(os.path.splitext(b)[1])
             if os.path.splitext(b)[1] == '.trace':
-                target_trace.append(b)
+                if b.startswith('a') == True:
+                    target_trace.append(b)
 
         #  ===========================start calculating===================
         [t_cut, ex_cut, ey_cut, ez_cut, fs, f0, f, f1, N] = time_data_get(E_path, Ts, show_flag)  # Signal interception
@@ -978,8 +988,8 @@ for i in range(0, len(target)):
                 Voc_noise_t[:, p] = Voc_shower_t[:, p]
                 Voc_noise_complex[:, p] = Voc_shower_complex[:, p]
             elif noise_flag == 1:
-                Voc_noise_t[:, p] = Voc_shower_t[:, p] + galactic_v_time[:, p]
-                Voc_noise_complex[:, p] = Voc_shower_complex[:, p] + galactic_v_complex_double[:, p]
+                Voc_noise_t[:, p] = Voc_shower_t[:, p] + galactic_v_time[random.randint(a=0, b=175), :, p]
+                Voc_noise_complex[:, p] = Voc_shower_complex[:, p] + galactic_v_complex_double[random.randint(a=0, b=175), :, p]
 
         [Voc_noise_t_ifft, Voc_noise_m_single, Voc_noise_p_single] = ifftget(Voc_noise_complex, N, f1, 2)
 
