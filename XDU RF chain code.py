@@ -210,13 +210,13 @@ def ifftget(data_ori, N, f1, true):
             data_ori_m[:, i] = abs(data_ori[:, i]) * 2 / N
             data_ori_m[0] = data_ori_m[0] / 2
 
-            data_ori_m_single = data_ori_m[0: len(f1)]  # 单边
+            data_ori_m_single = data_ori_m[0: len(f1)]  # double to single
 
-            data_ori_p = np.angle(data_ori, deg=True)  # 相位
-            data_ori_p = np.mod(data_ori_p, 2 * 180)  # -pi到pi转为0到2pi
+            data_ori_p = np.angle(data_ori, deg=True)  # phase
+            data_ori_p = np.mod(data_ori_p, 2 * 180)  # (-pi,pi) to (0,2pi)
             data_ori_p_single = data_ori_p[0: len(f1)]
 
-    # % % 时域
+    # % % Time domain
     data_ifft = np.zeros((N, lienum))
     for i in range(lienum):
         data_ifft[:, i] = ifft(data_ori[:, i]).real
@@ -272,7 +272,7 @@ def expan(N, f0, f1, f2, data):
     f = np.arange(0, N) * f0  # Frequency sequence
     effective = len(data)
     delta_start = abs(f - f1)  # Difference from f1
-    delta_end = abs(f - f2)  # Difference with f2
+    delta_end = abs(f - f2)  # Difference from f2
     f_hang_start = np.where(delta_start == min(delta_start))  # The row with the smallest difference
     f_hang_start = f_hang_start[0][0]
     f_hang_end = np.where(delta_end == min(delta_end))
@@ -411,7 +411,7 @@ def CEL(e_theta, e_phi, N, f0, unit, show_flag):
 
 
 # =========================================galacticnoise get=============================================
-def gala(lst, N, f0, f1, show_flag):
+def gala(lst, N, f0, f1, M, show_flag):
     # This Python file uses the following encoding: utf-8
 
 
@@ -459,25 +459,26 @@ def gala(lst, N, f0, f1, show_flag):
         plt.subplots_adjust(top=0.85)
         plt.show()
 
-    f_start = 30
-    f_end = 250
+    f_start = GALAfreq[0]
+    f_num = len(GALAfreq)
+    f_end = GALAfreq[f_num]
 
-    R = 50
-    v_complex_double = np.zeros((176, N, 3), dtype=complex)
-    galactic_v_time = np.zeros((176, N, 3), dtype=float)
-    galactic_v_m_single = np.zeros((176, int(N / 2) + 1, 3), dtype=float)
-    galactic_v_p_single = np.zeros((176, int(N / 2) + 1, 3), dtype=float)
+
+    v_complex_double = np.zeros((M, N, 3), dtype=complex)
+    galactic_v_time = np.zeros((M, N, 3), dtype=float)
+    galactic_v_m_single = np.zeros((M, int(N / 2) + 1, 3), dtype=float)
+    galactic_v_p_single = np.zeros((M, int(N / 2) + 1, 3), dtype=float)
     unit_uv = 1e6
-    V_amplitude = 2 * np.sqrt(GALApower_mag * R) * unit_uv
+    V_amplitude = GALAvoltage[:, :, lst-1]
 
-    aa = np.zeros((176, 221, 3), dtype=float)
-    phase = np.zeros((176, 221, 3), dtype=float)
-    v_complex = np.zeros((176, 221, 3), dtype=complex)
-    for mm in range(176):
-        for ff in range(221):
-            for pp in range(3):
-                aa[mm, ff, pp] = np.random.normal(loc=0, scale=V_amplitude[ff, pp])
-                phase[mm, ff, pp] = 2 * np.pi * random.random()  # 加入一随机高斯白噪声的相位
+    aa = np.zeros((M, f_num, 3), dtype=float)
+    phase = np.zeros((M, f_num, 3), dtype=float)
+    v_complex = np.zeros((M, f_num, 3), dtype=complex)
+    for mm in range(M): # antennas
+        for ff in range(f_num): # freq
+            for pp in range(3): # ports
+                aa[mm, ff, pp] = np.random.normal(loc=0, scale=V_amplitude[ff, pp]) # Generates a normal distribution with 0 as the mean and V_amplitude[ff, pp] as the standard deviation
+                phase[mm, ff, pp] = 2 * np.pi * random.random()  # phase of random Gauss noise
                 v_complex[mm, ff, pp] = abs(aa[mm, ff, pp] * N / 2) * np.exp(1j * phase[mm, ff, pp])
 
     pass
@@ -489,7 +490,7 @@ def gala(lst, N, f0, f1, show_flag):
             # print(v_complex_double[k, :, port])
         [galactic_v_time[kk], galactic_v_m_single[kk], galactic_v_p_single[kk]] = ifftget(v_complex_double[kk], N, f1, 2)
 
-        return v_complex_double, galactic_v_time
+    return v_complex_double, galactic_v_time
 
 
 # ===========================================LNAparameter get===========================================
@@ -509,7 +510,7 @@ def LNA_get(antennas11_complex_short, N, f0, unit, show_flag):
     # % ----------------------output - ---------------------------------- %
     # rou1 rou2 rou3
 
-    z0 = 50
+    z0 = 50 # characteristic impedance
 
     antenna_Gama_complex = np.zeros((N, 3), dtype=complex)
     for p in range(3):
@@ -528,7 +529,7 @@ def LNA_get(antennas11_complex_short, N, f0, unit, show_flag):
         #  LNA parameter
         str_p = str(p + 1)
         LNA_Address = ".//LNASparameter//" + str_p + ".s2p"
-        freq = np.loadtxt(LNA_Address, usecols=0) / 1e6  # HZ to MHz
+        freq = np.loadtxt(LNA_Address, usecols=0) / 1e6  # Hz to MHz
         if unit == 0:
             res11 = np.loadtxt(LNA_Address, usecols=1)
             ims11 = np.loadtxt(LNA_Address, usecols=2)
@@ -553,7 +554,7 @@ def LNA_get(antennas11_complex_short, N, f0, unit, show_flag):
             dBs21 = np.zeros((3, len(freq)))
         dBs21[p] = dbs21
 
-        # 插值为30-250mhz间隔1mhz一个数据
+        # Interpolate to (30:1:250)MHz
         freqnew = np.arange(30, 251, 1)
         f_res11 = interpolate.interp1d(freq, res11, kind="cubic")
         res11new = f_res11(freqnew)
@@ -682,7 +683,7 @@ def filter_get(N, f0, unit, show_flag):
 
         f_start = 30
         f_end = 250
-        # Interpolation is a data of 30-250mhz interval 1mhz
+        #  Interpolate to (30:1:250)MHz
         freqnew = np.arange(30, 251, 1)
         f_res11 = interpolate.interp1d(freq, res11, kind="cubic")
         res11new = f_res11(freqnew)
@@ -722,7 +723,7 @@ def filter_get(N, f0, unit, show_flag):
     cable_coefficient = (1 + cable_Gama_complex) * cable_s21_complex
 
     #  =================filter=========================================
-    filter_Gama_complex = np.zeros((N, 3), dtype=complex)  # 3个端口
+    filter_Gama_complex = np.zeros((N, 3), dtype=complex)  # 3 ports
     filter_s21_complex = np.zeros((N, 3), dtype=complex)
     for p in range(3):
         #  filter parameter
@@ -764,7 +765,7 @@ def filter_get(N, f0, unit, show_flag):
         dBs21[p] = dbs21
         dBs11[p] = dbs11
         dBs21_add_VGA[p] = dbs21_add_VGA
-        # 插值为30-250mhz间隔1mhz一个数据
+        #  Interpolate to (30:1:250)MHz
         freqnew = np.arange(30, 251, 1)
         f_res11 = interpolate.interp1d(freq, res11, kind="cubic")
         res11new = f_res11(freqnew)
@@ -916,13 +917,14 @@ for i in range(0, len(target)):
         for a in os.listdir(file_dir):
             # print(root)
             # print(os.path.isdir(root))
-            # if os.path.isdir(root) == True:            #判断是否为文件夹
+            # if os.path.isdir(root) == True:
             content.append(a)
         for b in content:
             # print(os.path.splitext(b)[1])
             if os.path.splitext(b)[1] == '.trace':
                 if b.startswith('a') == True:
                     target_trace.append(b)
+        M = len(target_trace)#number of antennas
 
         #  ===========================start calculating===================
         [t_cut, ex_cut, ey_cut, ez_cut, fs, f0, f, f1, N] = time_data_get(E_path, Ts, show_flag)  # Signal interception
@@ -939,7 +941,7 @@ for i in range(0, len(target)):
         Lcehang = Lce_complex.shape[0]
         Lcelie = Lce_complex.shape[2]
         # ======Galaxy noise power spectrum density, power, etc.=====================
-        [galactic_v_complex_double, galactic_v_time] = gala(lst, N, f0, f1, show_flag)
+        [galactic_v_complex_double, galactic_v_time] = gala(lst, N, f0, f1, M, show_flag)
         # =================== LNA=====================================================
         [rou1_complex, rou2_complex, rou3_complex] = LNA_get(antennas11_complex_short, N, f0, 1, show_flag)
         # =======================  cable  filter VGA balun=============================================
